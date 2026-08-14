@@ -29,6 +29,8 @@ jobs:
             switch-libjpeg-turbo \
             switch-libwebp \
             switch-freetype \
+            switch-harfbuzz \
+            switch-bzip2 \
             switch-mesa \
             switch-glad \
             switch-curl \
