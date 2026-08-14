@@ -165,8 +165,15 @@ int main(int argc, char* argv[]) {
     SDL_Window* window = SDL_CreateWindow("PICO-8 Launcher", SDL_WINDOWPOS_CENTERED, SDL_WINDOWPOS_CENTERED, 1280, 720, 0);
     SDL_Renderer* renderer = SDL_CreateRenderer(window, -1, SDL_RENDERER_ACCELERATED | SDL_RENDERER_PRESENTVSYNC);
 
-    TTF_Font* fontRegular = TTF_OpenFont("romfs:/PTSans-Regular.ttf", 16);
-    TTF_Font* fontBold = TTF_OpenFont("romfs:/PTSans-Bold.ttf", 22);
+    TTF_Font* fontRegular = nullptr;
+    TTF_Font* fontBold = nullptr;
+
+    // Try romfs first (first launch), then SD card (after chain-load)
+    fontRegular = TTF_OpenFont("romfs:/PTSans-Regular.ttf", 16);
+    if (!fontRegular) fontRegular = TTF_OpenFont("sdmc:/switch/pico8-launcher/font/PTSans-Regular.ttf", 16);
+
+    fontBold = TTF_OpenFont("romfs:/PTSans-Bold.ttf", 22);
+    if (!fontBold) fontBold = TTF_OpenFont("sdmc:/switch/pico8-launcher/font/PTSans-Bold.ttf", 22);
 
     loadConfig();
     std::vector<RomEntry> romList = scanRoms(g_config.rom_path);
