@@ -23,6 +23,8 @@ struct RomEntry {
     std::string filename;
     std::string fullPath;
     SDL_Texture* texture = nullptr;
+    int origW = 0;
+    int origH = 0;
 };
 
 enum AppState {
@@ -34,25 +36,26 @@ Config g_config;
 const std::string CONFIG_FILE = "sdmc:/switch/pico8-launcher/config.txt";
 
 // =============================================================================
-// Layout Constants
+// Layout: 6 columns × 2 rows = 12 games
 // =============================================================================
 constexpr int SCREEN_W = 1280;
 constexpr int SCREEN_H = 720;
 constexpr int HEADER_H = 50;
 constexpr int FOOTER_H = 45;
-constexpr int GRID_Y = 55;
-constexpr int GRID_H = SCREEN_H - HEADER_H - FOOTER_H - 10;
 
-constexpr int COLS = 4;
-constexpr int ROWS = 3;
+constexpr int COLS = 6;
+constexpr int ROWS = 2;
 constexpr int ITEMS_PER_PAGE = COLS * ROWS; // 12
 
-constexpr int CARD_W = 290;
-constexpr int CARD_H = 195;
-constexpr int GAP_X = 20;
+constexpr int CARD_W = 195;
+constexpr int CARD_H = 280;
+constexpr int GAP_X = 12;
 constexpr int GAP_Y = 15;
-constexpr int THUMB_SIZE = 150;
-constexpr int START_X = 30;
+constexpr int START_X = 20;
+constexpr int GRID_Y = 60;
+
+constexpr int THUMB_MAX_W = 175;
+constexpr int THUMB_MAX_H = 220;
 
 // =============================================================================
 // Colors
@@ -70,7 +73,7 @@ const SDL_Color C_ERROR    = { 220, 60, 60, 255 };
 const SDL_Color C_OVERLAY  = { 10, 10, 16, 240 };
 
 // =============================================================================
-// Helpers
+// Config I/O
 // =============================================================================
 void loadConfig() {
     std::ifstream file(CONFIG_FILE);
@@ -96,6 +99,9 @@ void saveConfig() {
     file << "launcher_path=" << g_config.launcher_path << "\n";
 }
 
+// =============================================================================
+// ROM Scanner
+// =============================================================================
 std::vector<RomEntry> scanRoms(const std::string& path) {
     std::vector<RomEntry> roms;
     if (!fs::exists(path)) return roms;
@@ -104,7 +110,7 @@ std::vector<RomEntry> scanRoms(const std::string& path) {
             std::string ext = entry.path().extension().string();
             std::transform(ext.begin(), ext.end(), ext.begin(), ::tolower);
             if (ext == ".p8" || ext == ".png") {
-                roms.push_back({ entry.path().filename().string(), entry.path().string(), nullptr });
+                roms.push_back({ entry.path().filename().string(), entry.path().string(), nullptr, 0, 0 });
             }
         }
     }
@@ -114,6 +120,9 @@ std::vector<RomEntry> scanRoms(const std::string& path) {
     return roms;
 }
 
+// =============================================================================
+// Texture Loader (keeps original aspect ratio)
+// =============================================================================
 void loadPageTextures(SDL_Renderer* renderer, std::vector<RomEntry>& roms, int pageStart, int count) {
     for (size_t i = 0; i < roms.size(); ++i) {
         bool inRange = (static_cast<int>(i) >= pageStart && static_cast<int>(i) < pageStart + count);
@@ -125,22 +134,31 @@ void loadPageTextures(SDL_Renderer* renderer, std::vector<RomEntry>& roms, int p
             }
             if (surf) {
                 roms[i].texture = SDL_CreateTextureFromSurface(renderer, surf);
+                roms[i].origW = surf->w;
+                roms[i].origH = surf->h;
                 SDL_FreeSurface(surf);
             }
         } else if (!inRange && roms[i].texture != nullptr) {
             SDL_DestroyTexture(roms[i].texture);
             roms[i].texture = nullptr;
+            roms[i].origW = 0;
+            roms[i].origH = 0;
         }
     }
 }
 
 // =============================================================================
-// CRASH FIX: pass ONLY the ROM path as argv[1] to fake-08
+// ORIGINAL WORKING launchFake08
 // =============================================================================
 void launchFake08(const std::string& fake08Path, const std::string& romFullPath) {
-    envSetNextLoad(fake08Path.c_str(), romFullPath.c_str());
+    char argBuffer[1024];
+    snprintf(argBuffer, sizeof(argBuffer), "\"%s\" \"%s\"", fake08Path.c_str(), romFullPath.c_str());
+    envSetNextLoad(fake08Path.c_str(), argBuffer);
 }
 
+// =============================================================================
+// Helpers
+// =============================================================================
 std::string swkbdInput(const std::string& guide, const std::string& initial) {
     SwkbdConfig kbd;
     char out[512] = {0};
@@ -175,6 +193,21 @@ void drawRect(SDL_Renderer* r, int x, int y, int w, int h, SDL_Color c, bool fil
 }
 
 // =============================================================================
+// Aspect-ratio thumbnail rect calculator
+// =============================================================================
+SDL_Rect getThumbRect(int cx, int cy, int origW, int origH) {
+    if (origW <= 0 || origH <= 0) {
+        return { cx + (CARD_W - THUMB_MAX_W) / 2, cy + 10, THUMB_MAX_W, THUMB_MAX_H };
+    }
+    float scale = std::min((float)THUMB_MAX_W / origW, (float)THUMB_MAX_H / origH);
+    int dw = (int)(origW * scale);
+    int dh = (int)(origH * scale);
+    int dx = cx + (CARD_W - dw) / 2;
+    int dy = cy + 10 + (THUMB_MAX_H - dh) / 2;
+    return { dx, dy, dw, dh };
+}
+
+// =============================================================================
 // Main
 // =============================================================================
 int main(int argc, char* argv[]) {
@@ -193,10 +226,10 @@ int main(int argc, char* argv[]) {
         SDL_RENDERER_ACCELERATED | SDL_RENDERER_PRESENTVSYNC);
 
     TTF_Font* fontHeader = TTF_OpenFont("romfs:/PTSans-Bold.ttf", 24);
-    TTF_Font* fontBody   = TTF_OpenFont("romfs:/PTSans-Regular.ttf", 17);
+    TTF_Font* fontBody   = TTF_OpenFont("romfs:/PTSans-Regular.ttf", 16);
     TTF_Font* fontSmall  = TTF_OpenFont("romfs:/PTSans-Regular.ttf", 14);
     if (!fontHeader) fontHeader = TTF_OpenFont("romfs:/PTSans-Regular.ttf", 24);
-    if (!fontBody)   fontBody   = TTF_OpenFont("romfs:/PTSans-Regular.ttf", 17);
+    if (!fontBody)   fontBody   = TTF_OpenFont("romfs:/PTSans-Regular.ttf", 16);
     if (!fontSmall)  fontSmall  = TTF_OpenFont("romfs:/PTSans-Regular.ttf", 14);
 
     loadConfig();
@@ -207,8 +240,6 @@ int main(int argc, char* argv[]) {
     int settingsOption = 0;
     int lastPage = -1;
     bool running = true;
-
-    // Analog repeat
     int analogDelay = 0;
     #define ANALOG_DEADZONE 15000
 
@@ -228,7 +259,7 @@ int main(int argc, char* argv[]) {
             lastPage = currentPage;
         }
 
-        // --- Analog navigation ---
+        // --- Analog ---
         bool analogUp    = analog.y < -ANALOG_DEADZONE;
         bool analogDown  = analog.y >  ANALOG_DEADZONE;
         bool analogLeft  = analog.x < -ANALOG_DEADZONE;
@@ -254,7 +285,7 @@ int main(int argc, char* argv[]) {
             analogDelay = 0;
         }
 
-        // --- Button input (physical Switch mapping via libnx) ---
+        // --- Buttons (libnx = physical Switch buttons) ---
         if (state == STATE_GRID) {
             if (kDown & HidNpadButton_Up)    { if (selectedIndex >= COLS) selectedIndex -= COLS; }
             if (kDown & HidNpadButton_Down)  { if (selectedIndex + COLS < totalItems) selectedIndex += COLS; }
@@ -262,48 +293,34 @@ int main(int argc, char* argv[]) {
             if (kDown & HidNpadButton_Right) { if (selectedIndex % COLS < COLS - 1 && selectedIndex + 1 < totalItems) selectedIndex += 1; }
 
             if (kDown & HidNpadButton_L) {
-                if (currentPage > 0) {
-                    selectedIndex = (currentPage - 1) * ITEMS_PER_PAGE;
-                    lastPage = -1;
-                }
+                if (currentPage > 0) { selectedIndex = (currentPage - 1) * ITEMS_PER_PAGE; lastPage = -1; }
             }
             if (kDown & HidNpadButton_R) {
-                if (currentPage + 1 < totalPages) {
-                    selectedIndex = (currentPage + 1) * ITEMS_PER_PAGE;
-                    lastPage = -1;
-                }
+                if (currentPage + 1 < totalPages) { selectedIndex = (currentPage + 1) * ITEMS_PER_PAGE; lastPage = -1; }
             }
 
-            // Physical A button (right) = Launch
             if (kDown & HidNpadButton_A) {
                 if (totalItems > 0 && selectedIndex < totalItems) {
                     launchFake08(g_config.fake08_path, romList[selectedIndex].fullPath);
                     running = false;
                 }
             }
-
-            // Physical X button (top) = Settings
             if (kDown & HidNpadButton_X) {
                 state = STATE_SETTINGS;
                 settingsOption = 0;
             }
-
-            // Physical Y button (left) = Rescan
             if (kDown & HidNpadButton_Y) {
                 for (auto& e : romList) if (e.texture) SDL_DestroyTexture(e.texture);
                 romList = scanRoms(g_config.rom_path);
                 selectedIndex = 0;
                 lastPage = -1;
             }
-
-            // Plus = Exit
             if (kDown & HidNpadButton_Plus) running = false;
 
         } else if (state == STATE_SETTINGS) {
             if (kDown & HidNpadButton_Up)   settingsOption = (settingsOption - 1 + 3) % 3;
             if (kDown & HidNpadButton_Down) settingsOption = (settingsOption + 1) % 3;
 
-            // Physical A = Edit selected row
             if (kDown & HidNpadButton_A) {
                 std::string guide = "Enter path";
                 std::string initial = "";
@@ -318,8 +335,6 @@ int main(int argc, char* argv[]) {
                     else if (settingsOption == 2) g_config.launcher_path = res;
                 }
             }
-
-            // Physical B (bottom) = Save and back
             if (kDown & HidNpadButton_B) {
                 saveConfig();
                 for (auto& e : romList) if (e.texture) SDL_DestroyTexture(e.texture);
@@ -330,7 +345,6 @@ int main(int argc, char* argv[]) {
             }
         }
 
-        // Clamp selection
         if (selectedIndex >= totalItems && totalItems > 0) selectedIndex = totalItems - 1;
         if (selectedIndex < 0) selectedIndex = 0;
 
@@ -347,11 +361,11 @@ int main(int argc, char* argv[]) {
         drawText(renderer, fontBody, "Tehrzky", SCREEN_W - 90, 16, C_MUTED);
 
         if (state == STATE_GRID) {
-            // --- Page indicator ---
+            // Page indicator
             std::string pageText = "Page " + std::to_string(currentPage + 1) + " / " + std::to_string(totalPages);
             drawText(renderer, fontSmall, pageText, SCREEN_W / 2, 18, C_MUTED, true);
 
-            // --- Grid ---
+            // --- 6×2 Grid ---
             for (int i = 0; i < ITEMS_PER_PAGE; ++i) {
                 int itemIdx = pageStart + i;
                 if (itemIdx >= totalItems) break;
@@ -360,29 +374,26 @@ int main(int argc, char* argv[]) {
                 int col = i % COLS;
                 int cx = START_X + col * (CARD_W + GAP_X);
                 int cy = GRID_Y + row * (CARD_H + GAP_Y);
-
                 bool isSel = (itemIdx == selectedIndex);
 
-                // Card bg
                 drawRect(renderer, cx, cy, CARD_W, CARD_H, isSel ? C_SELECTED : C_PANEL);
                 drawRect(renderer, cx, cy, CARD_W, CARD_H, isSel ? C_ACCENT : C_BORDER, false);
 
-                // Thumbnail
-                int tx = cx + (CARD_W - THUMB_SIZE) / 2;
-                int ty = cy + 8;
+                // Thumbnail with original aspect ratio
                 if (romList[itemIdx].texture) {
-                    SDL_Rect dst = { tx, ty, THUMB_SIZE, THUMB_SIZE };
+                    SDL_Rect dst = getThumbRect(cx, cy, romList[itemIdx].origIdx].origW, romList[itemIdx].origH);
                     SDL_RenderCopy(renderer, romList[itemIdx].texture, NULL, &dst);
                 } else {
-                    drawRect(renderer, tx, ty, THUMB_SIZE, THUMB_SIZE, C_BG);
-                    drawRect(renderer, tx, ty, THUMB_SIZE, THUMB_SIZE, C_BORDER, false);
-                    drawText(renderer, fontSmall, "NO ICON", tx + THUMB_SIZE/2, ty + THUMB_SIZE/2 - 6, C_MUTED, true);
+                    SDL_Rect placeholder = getThumbRect(cx, cy, 0, 0);
+                    drawRect(renderer, placeholder.x, placeholder.y, placeholder.w, placeholder.h, C_BG);
+                    drawRect(renderer, placeholder.x, placeholder.y, placeholder.w, placeholder.h, C_BORDER, false);
+                    drawText(renderer, fontSmall, "NO ICON", cx + CARD_W/2, cy + THUMB_MAX_H/2 + 10, C_MUTED, true);
                 }
 
-                // Title (truncated)
+                // Title
                 std::string title = romList[itemIdx].filename;
-                if (title.size() > 24) title = title.substr(0, 22) + "..";
-                drawText(renderer, fontBody, title, cx + CARD_W/2, cy + THUMB_SIZE + 18, C_WHITE, true);
+                if (title.size() > 20) title = title.substr(0, 18) + "..";
+                drawText(renderer, fontBody, title, cx + CARD_W/2, cy + THUMB_MAX_H + 20, C_WHITE, true);
             }
 
             if (romList.empty()) {
@@ -391,15 +402,12 @@ int main(int argc, char* argv[]) {
             }
 
         } else if (state == STATE_SETTINGS) {
-            // Dim background
             drawRect(renderer, 0, 0, SCREEN_W, SCREEN_H, C_OVERLAY);
 
-            // Panel
             int pw = 800, ph = 380;
             int px = (SCREEN_W - pw) / 2, py = (SCREEN_H - ph) / 2;
             drawRect(renderer, px, py, pw, ph, C_PANEL);
             drawRect(renderer, px, py, pw, ph, C_BORDER, false);
-
             drawText(renderer, fontHeader, "Settings", SCREEN_W/2, py + 20, C_WHITE, true);
 
             const char* labels[] = { "ROM Path:", "FAKE-08 Path:", "Launcher Path:" };
@@ -413,11 +421,10 @@ int main(int argc, char* argv[]) {
                 drawText(renderer, fontBody, labels[i], px + 50, ry + 5, labelColor);
                 drawText(renderer, fontSmall, values[i], px + 50, ry + 28, C_MUTED);
             }
-
             drawText(renderer, fontSmall, "A = Edit   B = Save & Back   Up/Down = Select", SCREEN_W/2, py + ph - 30, C_MUTED, true);
         }
 
-        // --- Footer / Controls Bar ---
+        // --- Footer ---
         drawRect(renderer, 0, SCREEN_H - FOOTER_H, SCREEN_W, FOOTER_H, C_FOOTER);
         drawRect(renderer, 0, SCREEN_H - FOOTER_H, SCREEN_W, 1, C_BORDER);
 
@@ -432,7 +439,6 @@ int main(int argc, char* argv[]) {
         SDL_RenderPresent(renderer);
     }
 
-    // Cleanup
     for (auto& e : romList) if (e.texture) SDL_DestroyTexture(e.texture);
     if (fontHeader) TTF_CloseFont(fontHeader);
     if (fontBody)   TTF_CloseFont(fontBody);
