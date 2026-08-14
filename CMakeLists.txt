@@ -37,6 +37,8 @@ target_link_libraries(pico8_launcher PRIVATE
     glapi
     drm_nouveau
     freetype
+    harfbuzz
+    bz2
     png
     jpeg
     webp
