@@ -50,7 +50,8 @@ jobs:
           nacptool --create 'PICO-8 Launcher' 'tehrzky' '1.0.0' build/pico8_launcher.nacp
           elf2nro build/pico8_launcher.elf pico8-launcher.nro \
             --nacp=build/pico8_launcher.nacp \
-            --romfsdir=romfs
+            --romfsdir=romfs \
+            --icon=icon.jpg
 
       - name: Upload NRO Artifact
         uses: actions/upload-artifact@v4
