@@ -4,13 +4,14 @@ project(pico8_launcher CXX C)
 set(CMAKE_CXX_STANDARD 17)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 
-if(NOT DEFINED ENV{DEVKITPRO})
-    set(ENV{DEVKITPRO} /opt/devkitpro)
+if(DEFINED ENV{DEVKITPRO})
+    set(DEVKITPRO $ENV{DEVKITPRO})
+else()
+    set(DEVKITPRO /opt/devkitpro)
 endif()
-set(DEVKITPRO $ENV{DEVKITPRO})
 
 list(APPEND CMAKE_MODULE_PATH "${DEVKITPRO}/cmake")
-include(SwitchTools REQUIRED)
+include("${DEVKITPRO}/cmake/SwitchTools.cmake")
 
 file(GLOB SOURCES "source/*.cpp")
 
