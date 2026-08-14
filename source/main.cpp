@@ -142,9 +142,12 @@ std::string swkbdInput(const std::string& guide, const std::string& initial) {
     return std::string(out);
 }
 
+// =============================================================================
+// BIGGER thumbnail: fills card width, up to 240px tall (was 160)
+// =============================================================================
 SDL_Rect getThumbRect(int cx, int cy, int cardW, int origW, int origH) {
-    int maxW = cardW - 20;
-    int maxH = 160;
+    int maxW = cardW - 20;   // 175px for 195px cards
+    int maxH = 240;          // was 160 — now fills the card
     if (origW <= 0 || origH <= 0) {
         return { cx + 10, cy + 10, maxW, maxH };
     }
@@ -331,12 +334,12 @@ int main(int argc, char* argv[]) {
                     SDL_RenderFillRect(renderer, &placeholder);
                     SDL_SetRenderDrawColor(renderer, C_BORDER.r, C_BORDER.g, C_BORDER.b, 255);
                     SDL_RenderDrawRect(renderer, &placeholder);
-                    renderTextCentered(renderer, fontRegular, "NO ICON", cx + CARD_W / 2, cy + 80, C_MUTED);
+                    renderTextCentered(renderer, fontRegular, "NO ICON", cx + CARD_W / 2, cy + 120, C_MUTED);
                 }
 
                 std::string title = romList[itemIdx].filename;
                 if (title.size() > 22) title = title.substr(0, 20) + "..";
-                renderTextCentered(renderer, fontRegular, title, cx + CARD_W / 2, cy + CARD_H - 28, C_WHITE);
+                renderTextCentered(renderer, fontRegular, title, cx + CARD_W / 2, cy + CARD_H - 24, C_WHITE);
             }
 
             if (romList.empty()) {
