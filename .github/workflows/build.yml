@@ -13,7 +13,7 @@ jobs:
 
     steps:
       - name: Checkout Code
-        uses: actions/checkout@v3
+        uses: actions/checkout@v4
 
       - name: Install Switch Dependencies
         shell: bash
@@ -41,7 +41,7 @@ jobs:
           make -j$(nproc)
 
       - name: Upload NRO Artifact
-        uses: actions/upload-artifact@v3
+        uses: actions/upload-artifact@v4
         with:
           name: pico8_launcher
           path: build/pico8_launcher.nro
