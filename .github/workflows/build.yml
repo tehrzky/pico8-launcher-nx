@@ -20,6 +20,8 @@ jobs:
         run: |
           dkp-pacman -Syu --noconfirm
           dkp-pacman -S --noconfirm \
+            switch-dev \
+            switch-tools \
             switch-sdl2 \
             switch-sdl2_image \
             switch-sdl2_ttf \
