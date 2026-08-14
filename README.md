@@ -1,4 +1,4 @@
-# PICO-8 Launcher NX
+# PICO-8 Launcher NX 
 
 A clean, fast homebrew ROM browser and launcher for PICO-8 cartridges on Nintendo Switch. Built with SDL2 and libnx.
 
