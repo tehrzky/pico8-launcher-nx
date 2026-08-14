@@ -2,24 +2,58 @@ name: Build Switch NRO
 
 on:
   push:
-    branches: [ "main", "master" ]
-  workflow_dispatch:
+    branches: [ main, master ]
+  pull_request:
+    branches: [ main, master ]
 
 jobs:
   build:
     runs-on: ubuntu-latest
-    container:
-      image: devkitpro/devkita64:latest
+    container: devkitpro/devkita64:latest
 
     steps:
-      - name: Checkout Source
+      - name: Checkout Code
         uses: actions/checkout@v4
 
-      - name: Build NRO
-        run: make
+      - name: Install Switch Dependencies
+        shell: bash
+        run: |
+          dkp-pacman -Syu --noconfirm
+          dkp-pacman -S --noconfirm \
+            switch-dev \
+            switch-tools \
+            switch-sdl2 \
+            switch-sdl2_image \
+            switch-sdl2_ttf \
+            switch-libpng \
+            switch-libjpeg-turbo \
+            switch-libwebp \
+            switch-freetype \
+            switch-harfbuzz \
+            switch-bzip2 \
+            switch-mesa \
+            switch-glad \
+            switch-curl \
+            switch-mbedtls
+
+      - name: Build ELF
+        shell: bash
+        run: |
+          mkdir build
+          cd build
+          cmake -DCMAKE_TOOLCHAIN_FILE=/opt/devkitpro/cmake/Switch.cmake ..
+          make -j$(nproc)
+
+      - name: Generate NRO
+        shell: bash
+        run: |
+          nacptool --create 'PICO-8 Launcher' 'tehrzky' '1.0.0' build/pico8_launcher.nacp
+          elf2nro build/pico8_launcher.elf pico8-launcher.nro \
+            --nacp=build/pico8_launcher.nacp \
+            --romfsdir=romfs
 
       - name: Upload NRO Artifact
         uses: actions/upload-artifact@v4
         with:
-          name: pico8-launcher-nro
+          name: pico8_launcher
           path: pico8-launcher.nro
