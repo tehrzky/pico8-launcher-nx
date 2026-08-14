@@ -2,7 +2,7 @@
 
 A clean, fast homebrew ROM browser and launcher for PICO-8 cartridges on Nintendo Switch. Built with SDL2 and libnx.
 
-![Grid](https://via.placeholder.com/800x450/101016/00c88c?text=6x2+Grid+Layout)
+![Grid](https://raw.githubusercontent.com/tehrzky/pico8-launcher-nx/refs/heads/main/icon.jpg)
 
 ## Features
 
