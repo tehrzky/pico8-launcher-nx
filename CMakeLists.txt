@@ -11,7 +11,6 @@ else()
 endif()
 
 list(APPEND CMAKE_MODULE_PATH "${DEVKITPRO}/cmake")
-include("${DEVKITPRO}/cmake/SwitchTools.cmake")
 
 file(GLOB SOURCES "source/*.cpp")
 
@@ -48,7 +47,6 @@ target_link_libraries(pico8_launcher PRIVATE
     z
     nx
 )
-
-nx_create_nro(pico8_launcher
-    ROMFS ${CMAKE_CURRENT_SOURCE_DIR}/romfs
-)
+# NOTE: no nx_create_nro() here - that CMake function doesn't exist in
+# devkitPro. Building the actual .nro (running nacptool + elf2nro) happens
+# as separate steps in the GitHub Actions workflow after `make` finishes.
