@@ -143,11 +143,43 @@ std::string swkbdInput(const std::string& guide, const std::string& initial) {
 }
 
 // =============================================================================
-// BIGGER thumbnail: fills card width, up to 240px tall (was 160)
+// Strip .p8.png, .p8, or .png from display name
 // =============================================================================
+std::string stripExtension(const std::string& filename) {
+    if (filename.size() > 7 && filename.substr(filename.size() - 7) == ".p8.png") {
+        return filename.substr(0, filename.size() - 7);
+    }
+    if (filename.size() > 3 && filename.substr(filename.size() - 3) == ".p8") {
+        return filename.substr(0, filename.size() - 3);
+    }
+    if (filename.size() > 4 && filename.substr(filename.size() - 4) == ".png") {
+        return filename.substr(0, filename.size() - 4);
+    }
+    return filename;
+}
+
+// =============================================================================
+// Pixel-perfect truncate: measures actual width, appends "..." if too long
+// =============================================================================
+std::string fitText(TTF_Font* font, const std::string& text, int maxWidth) {
+    if (!font || text.empty()) return text;
+    int w = 0, h = 0;
+    TTF_SizeText(font, text.c_str(), &w, &h);
+    if (w <= maxWidth) return text;
+
+    std::string result = text;
+    while (result.size() > 1) {
+        result.pop_back();
+        std::string test = result + "...";
+        TTF_SizeText(font, test.c_str(), &w, &h);
+        if (w <= maxWidth) return test;
+    }
+    return "...";
+}
+
 SDL_Rect getThumbRect(int cx, int cy, int cardW, int origW, int origH) {
-    int maxW = cardW - 20;   // 175px for 195px cards
-    int maxH = 240;          // was 160 — now fills the card
+    int maxW = cardW - 20;
+    int maxH = 240;
     if (origW <= 0 || origH <= 0) {
         return { cx + 10, cy + 10, maxW, maxH };
     }
@@ -337,8 +369,9 @@ int main(int argc, char* argv[]) {
                     renderTextCentered(renderer, fontRegular, "NO ICON", cx + CARD_W / 2, cy + 120, C_MUTED);
                 }
 
-                std::string title = romList[itemIdx].filename;
-                if (title.size() > 22) title = title.substr(0, 20) + "..";
+                // Strip extension + pixel-perfect truncate
+                std::string rawName = stripExtension(romList[itemIdx].filename);
+                std::string title = fitText(fontRegular, rawName, CARD_W - 16);
                 renderTextCentered(renderer, fontRegular, title, cx + CARD_W / 2, cy + CARD_H - 24, C_WHITE);
             }
 
