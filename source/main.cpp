@@ -127,7 +127,9 @@ int main(int argc, char* argv[]) {
     SDL_Window* window = SDL_CreateWindow("PICO-8 Launcher", SDL_WINDOWPOS_CENTERED, SDL_WINDOWPOS_CENTERED, 1280, 720, 0);
     SDL_Renderer* renderer = SDL_CreateRenderer(window, -1, SDL_RENDERER_ACCELERATED | SDL_RENDERER_PRESENTVSYNC);
 
-    TTF_Font* font = TTF_OpenFont("romfs:/font.ttf", 18);
+    // Load both regular and bold fonts from romfs
+    TTF_Font* fontRegular = TTF_OpenFont("romfs:/PTSans-Regular.ttf", 18);
+    TTF_Font* fontBold = TTF_OpenFont("romfs:/PTSans-Bold.ttf", 22);
 
     loadConfig();
     std::vector<RomEntry> romList = scanRoms(g_config.rom_path);
@@ -210,8 +212,10 @@ int main(int argc, char* argv[]) {
             SDL_SetRenderDrawColor(renderer, 35, 35, 45, 255);
             SDL_Rect headerRect = { 0, 0, 1280, 50 };
             SDL_RenderFillRect(renderer, &headerRect);
-            renderText(renderer, font, "PICO-8 Launcher", 20, 12, { 255, 255, 255, 255 });
-            renderText(renderer, font, "Press X: Settings | Press +: Exit", 920, 12, { 180, 180, 180, 255 });
+            
+            // Bold header, regular controls
+            renderText(renderer, fontBold, "PICO-8 Launcher", 20, 10, { 255, 255, 255, 255 });
+            renderText(renderer, fontRegular, "Press X: Settings | Press +: Exit", 920, 14, { 180, 180, 180, 255 });
 
             int startX = 40;
             int startY = 65;
@@ -249,29 +253,29 @@ int main(int argc, char* argv[]) {
                     SDL_RenderFillRect(renderer, &imgRect);
                 }
 
-                renderText(renderer, font, romList[itemIdx].filename, x + thumbSize + 12, y + 8, { 255, 255, 255, 255 });
+                renderText(renderer, fontRegular, romList[itemIdx].filename, x + thumbSize + 12, y + 8, { 255, 255, 255, 255 });
             }
 
             if (romList.empty()) {
-                renderText(renderer, font, "No ROMs found in target folder.", 480, 320, { 255, 100, 100, 255 });
-                renderText(renderer, font, g_config.rom_path, 420, 360, { 200, 200, 200, 255 });
+                renderText(renderer, fontBold, "No ROMs found in target folder.", 480, 320, { 255, 100, 100, 255 });
+                renderText(renderer, fontRegular, g_config.rom_path, 420, 360, { 200, 200, 200, 255 });
             }
         } else if (state == STATE_SETTINGS) {
-            renderText(renderer, font, "Settings", 580, 40, { 255, 255, 255, 255 });
+            renderText(renderer, fontBold, "Settings", 580, 40, { 255, 255, 255, 255 });
 
             SDL_Color activeColor = { 0, 255, 128, 255 };
             SDL_Color inactiveColor = { 200, 200, 200, 255 };
 
-            renderText(renderer, font, "ROM Path:", 100, 150, settingsOption == 0 ? activeColor : inactiveColor);
-            renderText(renderer, font, g_config.rom_path, 300, 150, { 255, 255, 255, 255 });
+            renderText(renderer, fontRegular, "ROM Path:", 100, 150, settingsOption == 0 ? activeColor : inactiveColor);
+            renderText(renderer, fontRegular, g_config.rom_path, 300, 150, { 255, 255, 255, 255 });
 
-            renderText(renderer, font, "FAKE-08 Path:", 100, 220, settingsOption == 1 ? activeColor : inactiveColor);
-            renderText(renderer, font, g_config.fake08_path, 300, 220, { 255, 255, 255, 255 });
+            renderText(renderer, fontRegular, "FAKE-08 Path:", 100, 220, settingsOption == 1 ? activeColor : inactiveColor);
+            renderText(renderer, fontRegular, g_config.fake08_path, 300, 220, { 255, 255, 255, 255 });
 
-            renderText(renderer, font, "Launcher Path:", 100, 290, settingsOption == 2 ? activeColor : inactiveColor);
-            renderText(renderer, font, g_config.launcher_path, 300, 290, { 255, 255, 255, 255 });
+            renderText(renderer, fontRegular, "Launcher Path:", 100, 290, settingsOption == 2 ? activeColor : inactiveColor);
+            renderText(renderer, fontRegular, g_config.launcher_path, 300, 290, { 255, 255, 255, 255 });
 
-            renderText(renderer, font, "Press B or X to save and return", 480, 600, { 150, 150, 150, 255 });
+            renderText(renderer, fontRegular, "Press B or X to save and return", 480, 600, { 150, 150, 150, 255 });
         }
 
         SDL_RenderPresent(renderer);
@@ -282,7 +286,8 @@ int main(int argc, char* argv[]) {
     }
 
     if (controller) SDL_GameControllerClose(controller);
-    if (font) TTF_CloseFont(font);
+    if (fontRegular) TTF_CloseFont(fontRegular);
+    if (fontBold) TTF_CloseFont(fontBold);
     
     IMG_Quit();
     TTF_Quit();
