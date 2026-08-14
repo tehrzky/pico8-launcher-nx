@@ -34,7 +34,7 @@ jobs:
             switch-curl \
             switch-mbedtls
 
-      - name: Build NRO
+      - name: Build ELF
         shell: bash
         run: |
           mkdir build
@@ -42,8 +42,16 @@ jobs:
           cmake -DCMAKE_TOOLCHAIN_FILE=/opt/devkitpro/cmake/Switch.cmake ..
           make -j$(nproc)
 
+      - name: Generate NRO
+        shell: bash
+        run: |
+          nacptool --create 'PICO-8 Launcher' 'tehrzky' '1.0.0' build/pico8_launcher.nacp
+          elf2nro build/pico8_launcher.elf pico8-launcher.nro \
+            --nacp=build/pico8_launcher.nacp \
+            --romfsdir=romfs
+
       - name: Upload NRO Artifact
         uses: actions/upload-artifact@v4
         with:
           name: pico8_launcher
-          path: build/pico8_launcher.nro
+          path: pico8-launcher.nro
